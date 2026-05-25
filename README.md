@@ -16,8 +16,23 @@ This starter keeps an n8n workflow export under source control and adds a small 
 ## Layout
 
 - `template/` contains the distributable n8n workflow DevOps starter.
+- `scripts/install-template.sh` installs only `template/` into a target directory.
 - `LICENSE` applies to this maintainer repository.
 - `TODO.md` and `pseduocode-setupscript.md` are maintainer planning files.
 - `git-conventional-commits.yaml` is maintainer repo configuration.
 
 There are no maintainer-level npm commands yet. To test the template in place, run commands from inside `template/`.
+
+## Install Template
+
+From an empty project directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/TheRealJamesRussell/n8n-workflow-agentic-development-framework/development/scripts/install-template.sh | bash
+```
+
+Or install into a new directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/TheRealJamesRussell/n8n-workflow-agentic-development-framework/development/scripts/install-template.sh | bash -s -- ./my-workflow
+```

@@ -359,13 +359,39 @@ function printSummary(summary) {
 	console.log(`Description: ${summary.description}`);
 	console.log(`Author: ${summary.author || '(not set)'}`);
 	console.log(`Development workflow name: ${summary.developmentName}`);
-	console.log(`Create development workflow: ${summary.createDevelopmentWorkflow ? 'yes' : 'no'}`);
+	if (summary.mode === 'start from scratch') {
+		console.log(`Create production and development workflows: ${summary.createRemoteWorkflows ? 'yes' : 'no'}`);
+	} else {
+		console.log(`Create development workflow: ${summary.createDevelopmentWorkflow ? 'yes' : 'no'}`);
+	}
 	console.log(`Save .env.development: ${summary.saveEnv ? 'yes' : 'no'}`);
 
 	if (summary.n8nConfig) {
 		console.log(`n8n base URL: ${summary.n8nConfig.baseUrl}`);
 		console.log(`n8n API key: ${mask(summary.n8nConfig.apiKey)}`);
 	}
+}
+
+function confirmationLabel(summary) {
+	const actions = [
+		'write manifest.json',
+		'write workflow.json',
+		'write TODO.md'
+	];
+
+	if (summary.createRemoteWorkflows) {
+		actions.push('create inactive production and development workflows in n8n');
+	}
+
+	if (summary.createDevelopmentWorkflow) {
+		actions.push('create an inactive development workflow in n8n');
+	}
+
+	if (summary.saveEnv) {
+		actions.push('write .env.development');
+	}
+
+	return `Apply these changes now (${actions.join(', ')})?`;
 }
 
 async function existingWorkflowSetup(prompter, envValues, manifest) {
@@ -399,7 +425,7 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 	};
 	printSummary(summary);
 
-	if (!await promptYesNo(prompter, 'Proceed?', true)) {
+	if (!await promptYesNo(prompter, confirmationLabel(summary), true)) {
 		console.log('Setup cancelled.');
 		return;
 	}
@@ -458,8 +484,8 @@ async function scratchSetup(prompter, envValues, manifest) {
 	const developmentName = developmentWorkflowName(slug);
 	const description = await promptRequired(prompter, 'Description', manifest.description || '');
 	const author = await promptOptional(prompter, 'Author (optional)', manifest.author || '');
-	const createDevelopmentWorkflow = await promptYesNo(prompter, 'Create an empty development workflow in n8n now?', true);
-	const n8nConfig = createDevelopmentWorkflow ? await getN8nConfig(prompter, envValues) : null;
+	const createRemoteWorkflows = await promptYesNo(prompter, 'Create production and development workflows in n8n now?', true);
+	const n8nConfig = createRemoteWorkflows ? await getN8nConfig(prompter, envValues) : null;
 	const saveEnv = n8nConfig ? await promptYesNo(prompter, 'Save n8n values to .env.development?', false) : false;
 
 	const summary = {
@@ -469,28 +495,40 @@ async function scratchSetup(prompter, envValues, manifest) {
 		description,
 		author,
 		developmentName,
-		createDevelopmentWorkflow,
+		createRemoteWorkflows,
 		saveEnv,
 		n8nConfig
 	};
 	printSummary(summary);
 
-	if (!await promptYesNo(prompter, 'Proceed?', true)) {
+	if (!await promptYesNo(prompter, confirmationLabel(summary), true)) {
 		console.log('Setup cancelled.');
 		return;
 	}
 
 	const blankWorkflow = normalizeWorkflow(readJson(WORKFLOW_PATH), workflowName);
+	let productionWorkflowId = null;
 	let developmentWorkflowId = null;
 
-	if (createDevelopmentWorkflow) {
-		const created = await n8nRequest(
+	if (createRemoteWorkflows) {
+		const createdProduction = await n8nRequest(
+			n8nConfig,
+			'POST',
+			workflowApiUrl(n8nConfig.baseUrl),
+			workflowPayload(blankWorkflow, workflowName)
+		);
+		productionWorkflowId = clean(createdProduction?.id);
+		if (!productionWorkflowId) {
+			throw new Error('n8n did not return an ID for the created production workflow.');
+		}
+
+		const createdDevelopment = await n8nRequest(
 			n8nConfig,
 			'POST',
 			workflowApiUrl(n8nConfig.baseUrl),
 			workflowPayload(blankWorkflow, developmentName)
 		);
-		developmentWorkflowId = clean(created?.id);
+		developmentWorkflowId = clean(createdDevelopment?.id);
 		if (!developmentWorkflowId) {
 			throw new Error('n8n did not return an ID for the created development workflow.');
 		}
@@ -503,9 +541,15 @@ async function scratchSetup(prompter, envValues, manifest) {
 		description,
 		author,
 		developmentName,
-		developmentBaseUrl: createDevelopmentWorkflow ? n8nConfig.baseUrl : null,
+		developmentBaseUrl: createRemoteWorkflows ? n8nConfig.baseUrl : null,
 		developmentWorkflowId,
-		production: null
+		production: createRemoteWorkflows
+			? {
+				baseUrl: n8nConfig.baseUrl,
+				workflowId: productionWorkflowId,
+				workflowName
+			}
+			: null
 	});
 
 	writeJson(WORKFLOW_PATH, blankWorkflow);

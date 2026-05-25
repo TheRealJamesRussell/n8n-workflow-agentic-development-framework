@@ -22,8 +22,13 @@ Types:
 ## Backlog
 
 - [ ] [P1] Tooling(setup): Create setup script.
+- [ ] [P1] Tooling(setup): Run final manual test for existing-workflow setup.
+- [ ] [P1] Tooling(setup): Run final manual test for start-from-scratch setup.
+- [ ] [P1] Tooling(testing): Add automated tests for the setup script.
+- [ ] [P1] Tooling(testing): Add maintainer-level tests that verify the template repo works as an installed project.
 - [ ] [P1] Docs(template): Sort out documentation.
 - [ ] [P1] Docs(architecture): Create base `architecture.md`.
+- [ ] [P1] Docs(agent-actions): Document agent action patterns for node creation, test writing, software development thinking, loop rules, and related workflow-building behaviors.
 - [ ] [P2] Skill(codex): Create skills.
 - [ ] [P2] Tooling(install): Create an install script for Ubuntu that can copy just the template into the active directory.
 - [ ] [P2] Skill(n8n-architecture): Create n8n architecture skill.

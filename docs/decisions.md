@@ -1,17 +1,117 @@
-# Maintainer Decisions
+# Maintainer Decision Log
 
-## Root Maintains the Template
+This file records maintainer decisions for `n8n-workflow-agentic-development-framework`.
+Use it for choices that affect the template artifact, installer behavior,
+repository layout, generated project boundaries, or maintainer workflow.
 
-The repository root is the maintainer workspace. It is allowed to contain notes, repo configuration, and future tooling that template users do not need.
+Keep entries short. If a decision later changes, add a new entry instead of
+rewriting history.
 
-## Template Contains the User Project
+## Format
 
-`template/` is the user-facing starter. Its files should make sense when copied into a new workflow project.
+Each decision should use this shape:
 
-## Template CI Lives in the Template
+```md
+## YYYY-MM-DD - Decision Title
 
-The GitHub workflow under `template/.github/` belongs to generated template projects, so it stays inside `template/`.
+Status: Decided | Proposed | Superseded
 
-## No Maintainer Commands Yet
+Decision: The choice we made.
 
-The root does not define npm commands yet. Template tests are run from inside `template/` until there is a clear maintainer workflow to automate.
+Reason: Why this is the right tradeoff now.
+
+Impact: What repository, template, installer, or documentation behavior this affects.
+```
+
+## 2026-05-25 - Root Maintains The Template
+
+Status: Decided
+
+Decision: The repository root is the maintainer workspace.
+
+Reason: The framework needs a place for notes, repo configuration, installer scripts,
+versioning, and future maintainer tooling that generated workflow projects do not need.
+
+Impact: Root files are maintainer files unless explicitly placed under `template/`.
+Generated workflow projects must not depend on root maintainer files.
+
+## 2026-05-25 - Template Contains The User Project
+
+Status: Decided
+
+Decision: `template/` is the user-facing starter copied into generated workflow
+projects.
+
+Reason: Keeping the template under one directory makes it clear what users receive
+and allows the maintainer repo to contain extra files without polluting generated
+projects.
+
+Impact: Files inside `template/` must work when `template/` becomes the project root.
+Template changes should be evaluated as changes to generated workflow projects.
+
+## 2026-05-25 - Installer Copies Only The Template
+
+Status: Decided
+
+Decision: `scripts/install-template.sh` installs only the contents of `template/`
+into the target directory.
+
+Reason: Users need the starter project, not maintainer docs, maintainer notes, or
+root repo configuration.
+
+Impact: Installer behavior must preserve the template boundary. Generated projects
+should not receive root `docs/`, root `AGENTS.md`, root `TODO.md`, or other
+maintainer-only files.
+
+## 2026-05-25 - Template CI Lives In The Template
+
+Status: Decided
+
+Decision: The GitHub workflow under `template/.github/` belongs to generated
+workflow projects, so it stays inside `template/`.
+
+Reason: The CI file should be installed with the generated project and run that
+project's own tests.
+
+Impact: Maintainer-level CI is not currently configured at the root. Template CI
+is copied by the installer.
+
+## 2026-05-25 - Root Manifest Versions The Template
+
+Status: Decided
+
+Decision: Root `manifest.json` stores framework and template artifact metadata,
+including template versioning.
+
+Reason: `template/manifest.json` belongs to generated n8n workflow projects and
+its `version` field describes workflow project metadata, not the template artifact
+itself.
+
+Impact: Template/framework versioning lives at root. Generated workflow project
+metadata remains in `template/manifest.json`.
+
+## 2026-05-25 - Template Setup Belongs In The Template
+
+Status: Decided
+
+Decision: The future setup command belongs under `template/scripts/` and is exposed
+through `template/package.json`.
+
+Reason: Setup runs after the template has been installed into a generated workflow
+project, so it should not depend on maintainer root files.
+
+Impact: `pseduocode-setupscript.md` remains maintainer design input, while the
+eventual implementation should live inside `template/`.
+
+## 2026-05-25 - No Maintainer Commands Yet
+
+Status: Decided
+
+Decision: The root does not define npm commands yet.
+
+Reason: There is not yet a clear maintainer command workflow. Adding root commands
+too early would blur the difference between the maintainer repo and generated
+workflow projects.
+
+Impact: Template tests are run from inside `template/` until maintainer automation
+is deliberately added.

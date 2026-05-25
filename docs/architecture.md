@@ -37,6 +37,15 @@ Architecture invariant: the installer copies template files only. It must not
 copy maintainer docs, maintainer notes, or root repository configuration into a
 generated project.
 
+### `manifest.json`
+
+Maintainer manifest for this framework and its distributable template artifact.
+This is where template versioning lives.
+
+Architecture invariant: root `manifest.json` versions the template/framework.
+`template/manifest.json` belongs to generated n8n workflow projects and versions
+that project's workflow metadata.
+
 ### `docs/`
 
 Maintainer documentation. These docs explain how this repository is organized,

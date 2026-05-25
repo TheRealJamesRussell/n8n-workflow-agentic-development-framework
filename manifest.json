@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "name": "n8n-workflow-agentic-development-framework",
+  "displayName": "n8n Workflow Agentic Development Framework",
+  "version": "0.1.0",
+  "description": "Maintainer manifest for the distributable n8n workflow development template.",
+  "type": "template-framework",
+  "template": {
+    "path": "template",
+    "version": "0.1.0"
+  }
+}

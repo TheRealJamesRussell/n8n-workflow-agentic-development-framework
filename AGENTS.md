@@ -56,3 +56,6 @@ This repository maintains the template in `template/`.
 ## Testing
 
 Run template commands from inside `template/` when changing template files.
+
+##comitting
+Keep commits atomic: commit only the files you touched and list each path explicitly. For tracked files run `git commit -m "<scoped message>" -- path/to/file1 path/to/file2`. For brand-new files, use the one-liner `git restore --staged :/ && git add "path/to/file1" "path/to/file2" && git commit -m "<scoped message>" -- path/to/file1 path/to/file2`

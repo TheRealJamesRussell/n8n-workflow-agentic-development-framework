@@ -1,6 +1,6 @@
 # Maintainer Architecture
 
-This document explains the maintainer layer of
+This document explains the high level architecture of
 `n8n-workflow-agentic-development-framework`: the template as software, the
 installer around it, and the repository boundaries that keep generated projects
 clean.
@@ -8,24 +8,13 @@ clean.
 If you are changing how the template is built, installed, maintained, or
 organized, start here.
 
-This is not the architecture document for workflows created from the template.
-That responsibility belongs to `template/docs/architecture.md`, which is copied
-into generated workflow projects and should describe the generated project's own
-architecture.
-
 ## Bird's Eye View
+On the highest level this tool is a methodology to create n8n workflows in a way
+that feels closer to software development. 
 
-This repository has two layers:
-
-```txt
-maintainer repo
-└── template/
-    └── generated workflow project
-```
-
-The root is the maintainer workspace. It contains notes, repo-level
-configuration, installer scripts, and future tooling for preparing or publishing
-the template.
+It primarily supports agentic development IE, using codex/claude/gemini to create
+the n8n workflows. But the tools and documentation within can support human first
+or agent first development to tackle n8n workflows from a DevOps Standpoint.
 
 `template/` is the user-facing starter. Its contents should make sense after
 being copied into a new n8n workflow project.
@@ -34,7 +23,7 @@ The most important rule is that generated workflow projects should not depend on
 maintainer-only files.
 
 ## Code Map
-
+---
 ### `template/`
 
 The distributable starter. The installer copies this directory into a user's

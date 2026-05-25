@@ -25,7 +25,6 @@ Types:
 - [ ] [P1] Docs(template): Sort out documentation.
 - [ ] [P1] Docs(architecture): Create base `architecture.md`.
 - [ ] [P2] Skill(codex): Create skills.
-- [ ] [P2] Tooling(n8n-nodes): Add a tool to pull latest n8n nodes so the user can work off of them.
 - [ ] [P2] Tooling(install): Create an install script for Ubuntu that can copy just the template into the active directory.
 - [ ] [P2] Skill(n8n-architecture): Create n8n architecture skill.
 - [ ] [P3] Research(n8n-nodes): Future improvement: add an MCP or skill that allows the agent to find nodes in their JSON format from n8n.

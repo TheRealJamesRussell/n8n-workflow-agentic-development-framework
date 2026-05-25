@@ -4,8 +4,8 @@
 |-- README.md
 |-- TODO.md
 |-- docs
-|   |-- architecture.md
-|   `-- decisions.md
+|   |-- architecture.md                               # Explains the architecture of the repo and goes into deeper detail about individual files.
+|   `-- decisions.md                                  # Maintain this with decisions made about the repo and template.
 |-- git-conventional-commits.yaml
 |-- pseduocode-setupscript.md
 |-- template

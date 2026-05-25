@@ -13,26 +13,55 @@ This repo contains the tools and setup for you to have proper DevOps and give ag
 
 This starter keeps an n8n workflow export under source control and adds a small DevOps frame around it: a manifest, local Code-node fixture tests, optional Layer 3 live workflow tests, and development push/verify scripts.
 
-## Layout
+## Template Layout
 
-- `template/` contains the distributable n8n workflow DevOps starter.
-- `scripts/install-template.sh` installs only `template/` into a target directory.
-- `LICENSE` applies to this maintainer repository.
-- `TODO.md` and `pseduocode-setupscript.md` are maintainer planning files.
-- `git-conventional-commits.yaml` is maintainer repo configuration.
+Everything below lives inside `template/`:
 
-There are no maintainer-level npm commands yet. To test the template in place, run commands from inside `template/`.
+```txt
+.
+├── README.md                    # user-facing project README
+├── AGENTS.md                    # agent working rules for generated projects
+├── manifest.json                # workflow metadata and environment config
+├── workflow.json                # tracked n8n workflow export
+├── package.json                 # project commands
+├── .env.development.example     # local development env example
+├── .github/                     # template CI
+├── docs/                        # architecture, credentials, testing, deployment docs
+├── scripts/                     # checks, fixtures, n8n push/pull/verify helpers
+└── tests/                       # Code-node and live workflow fixtures
+```
 
-## Install Template
+## Install the Template
 
-From an empty project directory:
+Create a directory and open it:
+
+```sh
+mkdir my-workflow && cd my-workflow
+```
+
+Pull the template from inside the new directory:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/TheRealJamesRussell/n8n-workflow-agentic-development-framework/development/scripts/install-template.sh | bash
 ```
 
-Or install into a new directory:
+Run the setup script:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TheRealJamesRussell/n8n-workflow-agentic-development-framework/development/scripts/install-template.sh | bash -s -- ./my-workflow
+npm run setup
+```
+
+Initialize Git:
+
+```sh
+git init
+git add .
+git commit -m "chore: initialize n8n workflow project"
+```
+
+Set your remote GitHub repo and push:
+
+```sh
+git remote add origin <your-repo-url>
+git push -u origin development
 ```

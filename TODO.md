@@ -27,4 +27,6 @@ Types:
 - [ ] [P2] Skill(codex): Create skills.
 - [ ] [P2] Tooling(install): Create an install script for Ubuntu that can copy just the template into the active directory.
 - [ ] [P2] Skill(n8n-architecture): Create n8n architecture skill.
+- [ ] [P2] Skill(n8n-security): Create n8n security hardening skill.
+- [ ] [P2] Feature(development-security): Add security hardening for development workflows so discovered development webhooks are not publicly usable.
 - [ ] [P3] Research(n8n-nodes): Future improvement: add an MCP or skill that allows the agent to find nodes in their JSON format from n8n.

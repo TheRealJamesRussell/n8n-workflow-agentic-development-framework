@@ -16,21 +16,16 @@ It primarily supports agentic development IE, using codex/claude/gemini to creat
 the n8n workflows. But the tools and documentation within can support human first
 or agent first development to tackle n8n workflows from a DevOps Standpoint.
 
-`template/` is the user-facing starter. Its contents should make sense after
-being copied into a new n8n workflow project.
+`template/` is the user-facing repo. The contents a end user receives to start a 
+n8n workflow project or integrate a existing workflow into the repo.
 
 The most important rule is that generated workflow projects should not depend on
 maintainer-only files.
 
-## Code Map
+## Maintainer Code Map
 ---
-### `template/`
-
-The distributable starter. The installer copies this directory into a user's
-project directory.
-
-Architecture invariant: files inside `template/` must work when `template/` is
-the project root.
+This map covers the root of this repository: the files used to maintain the
+template as software.
 
 ### `scripts/install-template.sh`
 
@@ -97,6 +92,149 @@ License for the maintainer repository.
 
 Architecture invariant: the template does not currently ship with its own
 license file.
+
+## Template Code Map
+
+This map covers `template/`: the files copied into generated workflow projects.
+The template contents are still maintainer-relevant because changing them changes
+what users install.
+
+Architecture invariant: files inside `template/` must work when `template/` is
+the project root.
+
+### `template/README.md`
+
+User-facing project README. It explains how to use the generated workflow
+project after installation.
+
+Architecture invariant: this README should make sense outside the maintainer
+repo.
+
+### `template/AGENTS.md`
+
+Agent instructions for generated workflow projects.
+
+Architecture invariant: these instructions should guide work in a workflow
+project, not in the maintainer repository.
+
+### `template/manifest.json`
+
+Project metadata: workflow identity, n8n runtime version, source workflow path,
+and environment configuration.
+
+Architecture invariant: scripts should read workflow source and environment
+metadata from this manifest rather than hardcoding project names or paths.
+
+### `template/workflow.json`
+
+Tracked n8n workflow export.
+
+Architecture invariant: this is the source workflow file in generated projects.
+
+### `template/package.json`
+
+User-facing npm commands for checks, local Code-node fixtures, live workflow
+fixtures, and n8n development push/pull/verify.
+
+Architecture invariant: commands must work from the generated project root.
+
+### `template/.env.development.example`
+
+Example development environment values for live n8n commands.
+
+Architecture invariant: example files may document variable names, but must not
+contain secrets.
+
+### `template/.gitignore`
+
+Ignore rules for generated workflow projects.
+
+Architecture invariant: local env files, generated snapshots, and temporary
+outputs should not be tracked.
+
+### `template/.github/`
+
+GitHub Actions workflow for generated projects.
+
+Architecture invariant: template CI lives inside `template/` because generated
+projects should receive it.
+
+### `template/docs/`
+
+User-facing documentation for generated workflow projects. This includes
+architecture, credentials, getting started, deployment, and testing docs.
+
+Architecture invariant: `template/docs/architecture.md` describes the generated
+project architecture. It is not responsible for this maintainer repo's
+architecture.
+
+### `template/scripts/check-static.js`
+
+Generic project health check for generated workflow projects.
+
+Architecture invariant: checks should validate useful project health, not
+maintainer-only rules.
+
+### `template/scripts/run-code-node-fixtures.js`
+
+Local Code-node fixture runner.
+
+Architecture invariant: this test layer should not require n8n network access.
+
+### `template/scripts/run-development-fixtures.js`
+
+Layer 3 live workflow fixture runner.
+
+Architecture invariant: live workflow tests require explicit development n8n
+configuration.
+
+### `template/scripts/n8n-lib.js`
+
+Shared helper module for n8n API calls, manifest loading, development
+environment parsing, and workflow comparison.
+
+Architecture invariant: live n8n scripts should share safety checks here rather
+than duplicating them.
+
+### `template/scripts/n8n-pull-development-workflow.js`
+
+Pulls the configured development workflow snapshot from n8n.
+
+Architecture invariant: output belongs under `tmp/`.
+
+### `template/scripts/n8n-push-development-workflow.js`
+
+Pushes local `workflow.json` to the configured development workflow.
+
+Architecture invariant: development activation must remain opt-in.
+
+### `template/scripts/n8n-verify-development-workflow.js`
+
+Verifies that the configured development workflow matches the local source.
+
+Architecture invariant: verification compares against the generated development
+variant, not against unrelated remote workflow state.
+
+### `template/scripts/layer3/`
+
+Generic helpers for fixture discovery, webhook requests, execution lookup,
+assertions, and reports.
+
+Architecture invariant: external side-effect adapters should be optional and
+project-specific.
+
+### `template/scripts/setup-placeholder.js`
+
+Placeholder for the future `npm run setup` flow.
+
+Architecture invariant: setup belongs to generated workflow projects, so the
+implementation should stay under `template/scripts/`.
+
+### `template/tests/`
+
+Fixture directories for local Code-node tests and live workflow tests.
+
+Architecture invariant: empty fixture directories are valid in the starter.
 
 ## Template Boundary
 

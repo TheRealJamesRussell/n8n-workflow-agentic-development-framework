@@ -1,0 +1,325 @@
+const fs = require('fs');
+const path = require('path');
+
+const REPO_ROOT = path.resolve(__dirname, '..');
+const DEFAULT_WORKFLOW_PATH = 'workflow.json';
+const DEFAULT_REMOTE_SNAPSHOT_PATH = 'tmp/n8n-development-workflow.remote.json';
+const DEFAULT_DEVELOPMENT_VARIANT_PATH = 'tmp/n8n-development-workflow.generated.json';
+const MANIFEST_PATH = 'manifest.json';
+
+function clean(value) {
+	return String(value || '').trim();
+}
+
+function envFlag(name) {
+	return clean(process.env[name]).toLowerCase() === 'true';
+}
+
+function repoPath(relativePath) {
+	return path.resolve(REPO_ROOT, relativePath);
+}
+
+function readJson(relativePath) {
+	return JSON.parse(fs.readFileSync(repoPath(relativePath), 'utf8'));
+}
+
+function writeJson(relativePath, data) {
+	const fullPath = repoPath(relativePath);
+	fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+	fs.writeFileSync(fullPath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+function loadDotEnv(filePath) {
+	if (!fs.existsSync(filePath)) return;
+
+	for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith('#')) continue;
+
+		const equalsIndex = trimmed.indexOf('=');
+		if (equalsIndex === -1) continue;
+
+		const key = trimmed.slice(0, equalsIndex).trim();
+		let value = trimmed.slice(equalsIndex + 1).trim();
+
+		if (
+			(value.startsWith('"') && value.endsWith('"')) ||
+			(value.startsWith("'") && value.endsWith("'"))
+		) {
+			value = value.slice(1, -1);
+		}
+
+		if (!process.env[key]) process.env[key] = value;
+	}
+}
+
+function loadLocalEnv() {
+	loadDotEnv(path.join(REPO_ROOT, '.env.development'));
+	loadDotEnv(path.join(REPO_ROOT, '.env.local'));
+}
+
+function getDevelopmentTestWebhookPath(manifest) {
+	return clean(manifest.environments?.development?.entrypoints?.testWebhookPath);
+}
+
+function requireDevelopmentTestWebhookPath(manifest) {
+	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
+	if (!testWebhookPath) {
+		throw new Error(
+			'manifest.json is missing environments.development.entrypoints.testWebhookPath; configure it before running Layer 3 workflow tests.'
+		);
+	}
+	return testWebhookPath;
+}
+
+function requireDevelopmentEnv(options = {}) {
+	loadLocalEnv();
+
+	const manifest = readJson(MANIFEST_PATH);
+	const developmentEnvironment = manifest.environments?.development || {};
+	const requireTestWebhook = options.requireTestWebhook === true;
+
+	const environment = clean(process.env.N8N_ENVIRONMENT);
+	const workflowId = clean(
+		process.env.N8N_DEVELOPMENT_WORKFLOW_ID ||
+		developmentEnvironment.workflowId
+	);
+	const workflowName = clean(
+		process.env.N8N_DEVELOPMENT_WORKFLOW_NAME ||
+		developmentEnvironment.workflowName
+	);
+	const baseUrl = clean(
+		process.env.N8N_BASE_URL ||
+		developmentEnvironment.baseUrl
+	).replace(/\/+$/, '');
+	const localWorkflowPath = clean(
+		process.env.N8N_LOCAL_WORKFLOW_PATH ||
+		manifest.source
+	) || DEFAULT_WORKFLOW_PATH;
+
+	const config = {
+		manifest,
+		baseUrl,
+		apiKey: clean(process.env.N8N_API_KEY),
+		environment,
+		workflowId,
+		workflowName,
+		localWorkflowPath,
+		testWebhookPath: getDevelopmentTestWebhookPath(manifest),
+		activateDevelopmentWorkflow: envFlag('N8N_ACTIVATE_DEVELOPMENT_WORKFLOW'),
+		requireActiveWorkflow: envFlag('N8N_REQUIRE_ACTIVE_WORKFLOW'),
+		developmentVariantPath: clean(process.env.N8N_DEVELOPMENT_VARIANT_PATH) ||
+			DEFAULT_DEVELOPMENT_VARIANT_PATH,
+		remoteSnapshotPath: clean(process.env.N8N_REMOTE_SNAPSHOT_PATH) || DEFAULT_REMOTE_SNAPSHOT_PATH
+	};
+
+	const missing = [];
+	if (!config.baseUrl) missing.push('N8N_BASE_URL or environments.development.baseUrl');
+	if (!config.apiKey) missing.push('N8N_API_KEY');
+	if (!config.workflowId) missing.push('N8N_DEVELOPMENT_WORKFLOW_ID or environments.development.workflowId');
+	if (!config.workflowName) missing.push('N8N_DEVELOPMENT_WORKFLOW_NAME or environments.development.workflowName');
+	if (requireTestWebhook && !config.testWebhookPath) {
+		missing.push('environments.development.entrypoints.testWebhookPath');
+	}
+
+	if (missing.length > 0) {
+		throw new Error(`Missing required development values: ${missing.join(', ')}`);
+	}
+
+	if (config.environment !== 'development') {
+		throw new Error('Refusing to call n8n unless N8N_ENVIRONMENT=development.');
+	}
+
+	return config;
+}
+
+function cloneJson(value) {
+	return JSON.parse(JSON.stringify(value));
+}
+
+function isWebhookNode(node) {
+	return node?.type === 'n8n-nodes-base.webhook';
+}
+
+function getWebhookPath(node) {
+	return clean(node?.parameters?.path || node?.parameters?.options?.path);
+}
+
+function findDevelopmentTestWebhookNodes(workflow, manifest) {
+	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
+	if (!testWebhookPath) return [];
+
+	return (Array.isArray(workflow?.nodes) ? workflow.nodes : [])
+		.filter(isWebhookNode)
+		.filter(node => getWebhookPath(node) === testWebhookPath);
+}
+
+function assertDevelopmentTestWebhookIfPresent(workflow, manifest) {
+	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
+	if (!testWebhookPath) {
+		return { checked: false, reason: 'not configured', nodes: [] };
+	}
+
+	const matchingNodes = findDevelopmentTestWebhookNodes(workflow, manifest);
+	if (matchingNodes.length === 0) {
+		return { checked: false, reason: 'workflow has no matching development test webhook', nodes: [] };
+	}
+
+	return {
+		checked: true,
+		nodes: matchingNodes.map(node => node.name || '(unnamed Webhook)')
+	};
+}
+
+function assertWorkflowHasDevelopmentTestWebhook(workflow, manifest) {
+	const testWebhookPath = requireDevelopmentTestWebhookPath(manifest);
+	const nodes = findDevelopmentTestWebhookNodes(workflow, manifest);
+
+	if (nodes.length === 0) {
+		throw new Error(`Workflow is missing development test webhook path "${testWebhookPath}".`);
+	}
+
+	return nodes;
+}
+
+function validateRemoteDevelopmentWorkflow(config, remoteWorkflow) {
+	const remoteId = clean(remoteWorkflow?.id);
+	const remoteName = clean(remoteWorkflow?.name);
+	const expectedId = clean(config.workflowId);
+	const expectedName = clean(config.workflowName);
+
+	if (!remoteWorkflow || typeof remoteWorkflow !== 'object') {
+		throw new Error('n8n returned an invalid workflow response.');
+	}
+
+	if (remoteId && remoteId !== expectedId) {
+		throw new Error(`Refusing to update workflow ${remoteId}; expected development workflow ${expectedId}.`);
+	}
+
+	if (remoteName !== expectedName) {
+		throw new Error(`Refusing to update workflow named "${remoteName}"; expected "${expectedName}".`);
+	}
+
+	if (!expectedName.toLowerCase().includes('development')) {
+		throw new Error('Development workflow name must contain "development".');
+	}
+}
+
+function assertDevelopmentActivationSafety(workflow, config) {
+	const workflowName = clean(workflow?.name || config.workflowName);
+	if (!workflowName.toLowerCase().includes('development')) {
+		throw new Error('Refusing to activate a workflow whose name does not contain "development".');
+	}
+
+	return assertDevelopmentTestWebhookIfPresent(workflow, config.manifest);
+}
+
+function createDevelopmentWorkflowVariant(sourceWorkflow, config) {
+	const workflow = cloneJson(sourceWorkflow);
+	workflow.name = config.workflowName || workflow.name;
+
+	return {
+		workflow,
+		variantPath: config.developmentVariantPath,
+		rewrittenFormTriggers: 0,
+		testWebhookCheck: assertDevelopmentTestWebhookIfPresent(workflow, config.manifest)
+	};
+}
+
+function workflowApiUrl(config) {
+	return `${config.baseUrl}/api/v1/workflows/${encodeURIComponent(config.workflowId)}`;
+}
+
+function workflowActionApiUrl(config, action) {
+	return `${workflowApiUrl(config)}/${encodeURIComponent(action)}`;
+}
+
+async function n8nRequest(config, method, body, url = workflowApiUrl(config)) {
+	const response = await fetch(url, {
+		method,
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			'X-N8N-API-KEY': config.apiKey
+		},
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+
+	const text = await response.text();
+	let payload = null;
+
+	if (text) {
+		try {
+			payload = JSON.parse(text);
+		} catch (error) {
+			payload = { raw: text };
+		}
+	}
+
+	if (!response.ok) {
+		const detail = payload?.message || payload?.raw || response.statusText;
+		throw new Error(`n8n ${method} failed with HTTP ${response.status}: ${detail}`);
+	}
+
+	return payload;
+}
+
+async function activateDevelopmentWorkflow(config) {
+	if (config.environment !== 'development') {
+		throw new Error('Refusing to activate n8n workflow unless N8N_ENVIRONMENT=development.');
+	}
+
+	if (!clean(config.workflowName).toLowerCase().includes('development')) {
+		throw new Error('Refusing to activate a workflow whose configured name does not contain "development".');
+	}
+
+	return n8nRequest(config, 'POST', undefined, workflowActionApiUrl(config, 'activate'));
+}
+
+function workflowUpdatePayload(localWorkflow, config = {}) {
+	const required = ['name', 'nodes', 'connections', 'settings'];
+	const missing = required.filter(key => localWorkflow[key] === undefined);
+
+	if (missing.length > 0) {
+		throw new Error(`Local workflow is missing required field(s): ${missing.join(', ')}`);
+	}
+
+	return {
+		name: config.workflowName || localWorkflow.name,
+		nodes: localWorkflow.nodes,
+		connections: localWorkflow.connections,
+		settings: localWorkflow.settings
+	};
+}
+
+function comparableWorkflow(workflow) {
+	return {
+		name: workflow.name,
+		nodes: workflow.nodes,
+		connections: workflow.connections,
+		settings: workflow.settings
+	};
+}
+
+function stableJson(value) {
+	return JSON.stringify(value, null, 2);
+}
+
+module.exports = {
+	activateDevelopmentWorkflow,
+	assertDevelopmentActivationSafety,
+	assertDevelopmentTestWebhookIfPresent,
+	assertWorkflowHasDevelopmentTestWebhook,
+	comparableWorkflow,
+	createDevelopmentWorkflowVariant,
+	getDevelopmentTestWebhookPath,
+	loadLocalEnv,
+	n8nRequest,
+	readJson,
+	requireDevelopmentEnv,
+	requireDevelopmentTestWebhookPath,
+	stableJson,
+	validateRemoteDevelopmentWorkflow,
+	workflowUpdatePayload,
+	writeJson
+};

@@ -1,0 +1,6 @@
+.env
+.env.local
+.env.development
+tmp/
+template/tmp/
+*:Zone.Identifier

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "name": "project-name",
+  "displayName": "Project Name",
+  "version": "0.1.0",
+  "description": "Source-controlled n8n workflow project.",
+  "type": "n8n-workflow",
+  "author": "",
+  "source": "workflow.json",
+  "runtime": {
+    "name": "n8n",
+    "testedVersion": "1.122.4",
+    "minimumVersion": "1.122.4"
+  },
+  "environments": {
+    "development": {
+      "baseUrl": null,
+      "workflowId": null,
+      "workflowName": "development_project-name",
+      "entrypoints": {
+        "testWebhookPath": "project-name-development-test"
+      }
+    },
+    "production": {
+      "baseUrl": null,
+      "workflowId": null,
+      "workflowName": null,
+      "entrypoints": {},
+      "releasePolicy": "Not configured."
+    }
+  }
+}

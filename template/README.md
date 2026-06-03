@@ -8,6 +8,7 @@ This starter keeps an n8n workflow export under source control and adds a small 
 
 - `workflow.json` is the tracked n8n workflow source.
 - `manifest.json` describes the project, runtime version, source path, and environment metadata.
+- `docs/node-creation.md` documents workflow graph rules for loops, HTTP nodes, rate limits, and explicit data references.
 - `scripts/` contains checks, fixture runners, and n8n development deployment helpers.
 - `tests/code-node-fixtures/` is for local Code-node fixtures.
 - `tests/development-fixtures/` is for live n8n webhook fixtures.

@@ -24,6 +24,10 @@ Layer 3 development fixtures post requests to an active n8n development webhook,
 
 Development push and verify scripts read `manifest.source`, create a generated development variant under `tmp/`, and compare it with the configured n8n development workflow.
 
+## Node Design
+
+Workflow graph changes should follow `docs/node-creation.md`. The default design posture is explicit data contracts, sequential loop phases, HTTP Request nodes with predefined n8n credentials for inspectable API calls, and graph-level handling for retryable HTTP responses.
+
 ## Repository Boundaries
 
 The base repo is target-agnostic. Third-party verification, cleanup, and side effects should be added through project-specific adapters, not through the default framework.

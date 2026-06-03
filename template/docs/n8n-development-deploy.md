@@ -39,7 +39,7 @@ npm run n8n:push:development
 
 The script reads `manifest.source`, creates `tmp/n8n-development-workflow.generated.json`, updates the configured development workflow, and writes `tmp/n8n-development-workflow.remote.json`.
 
-If `environments.development.entrypoints.testWebhookPath` is configured and the tracked workflow does not already contain that webhook, the generated development variant adds an unconnected `Development Test Webhook` node. Setup derives this path from the project slug by default. When another trigger exists on the canvas, the node is placed below it so the user or agent can connect it intentionally.
+`npm run setup` adds the unconnected `Development Test Webhook` node to the workflow when it creates the project. The push script does not invent workflow nodes; it pushes the configured workflow source to development.
 
 ## Verify
 

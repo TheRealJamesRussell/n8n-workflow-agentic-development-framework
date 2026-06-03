@@ -17,16 +17,14 @@ The secret is generated locally and stays in `.env.development`. Do not commit i
 
 ## Push Behavior
 
-`npm run n8n:push:development` reads the local workflow and creates a development variant under `tmp/`.
+`npm run setup` adds an unconnected `Development Test Webhook` node to the workflow when it creates or pulls the project workflow. Setup derives the path from the project slug by default. When another trigger exists on the canvas, the node is placed below it.
 
-If `manifest.json` configures `environments.development.entrypoints.testWebhookPath` and the tracked workflow does not already contain that webhook, the generated development variant adds an unconnected `Development Test Webhook` node. Setup derives this path from the project slug by default. When another trigger exists on the canvas, the node is placed below it.
-
-The push script then checks the remote development workflow:
+`npm run n8n:push:development` reads the local workflow and creates a development variant under `tmp/`. The push script checks the remote development workflow:
 
 - If the remote webhook already has authentication, the script preserves the remote authentication mode and credential reference.
 - If the remote webhook has no authentication, the script creates an n8n `httpHeaderAuth` credential using the local header name and secret, then attaches that credential to the development webhook.
 
-The tracked `workflow.json` does not need to contain the generated webhook node or credential reference. The generated and remote workflow variants may contain the development webhook and credential ID/name because n8n needs those to run the test entrypoint.
+The tracked `workflow.json` contains the development webhook node. It should not contain the credential secret value. The generated and remote workflow variants may contain credential ID/name because n8n needs those to run the test entrypoint.
 
 ## Test Behavior
 

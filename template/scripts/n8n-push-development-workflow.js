@@ -60,9 +60,6 @@ async function main() {
 	writeJson(config.remoteSnapshotPath, finalRemoteWorkflow);
 
 	console.log(`Updated development workflow ${config.workflowId}`);
-	if (developmentVariant.developmentTestWebhook.added) {
-		console.log(`Added development test webhook node: ${developmentVariant.developmentTestWebhook.node.name}`);
-	}
 	if (webhookAuth.preserved) {
 		console.log(`Preserved development test webhook ${webhookAuth.authentication} authentication`);
 	}

@@ -186,6 +186,100 @@ function developmentEntrypoints(manifest, slug) {
 	};
 }
 
+function cloneJson(value) {
+	return JSON.parse(JSON.stringify(value));
+}
+
+function isWebhookNode(node) {
+	return node?.type === 'n8n-nodes-base.webhook';
+}
+
+function isTriggerLikeNode(node) {
+	const type = clean(node?.type).toLowerCase();
+	return type.includes('trigger') || type === 'n8n-nodes-base.webhook';
+}
+
+function getWebhookPath(node) {
+	return clean(node?.parameters?.path || node?.parameters?.options?.path);
+}
+
+function uniqueNodeName(nodes, baseName) {
+	const existing = new Set(nodes.map(node => clean(node?.name)).filter(Boolean));
+	if (!existing.has(baseName)) return baseName;
+
+	let index = 2;
+	while (existing.has(`${baseName} ${index}`)) {
+		index += 1;
+	}
+
+	return `${baseName} ${index}`;
+}
+
+function triggerAnchorPosition(workflow) {
+	const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+	const triggerNodes = nodes
+		.filter(isTriggerLikeNode)
+		.sort((left, right) => {
+			const leftY = Number(left.position?.[1] || 0);
+			const rightY = Number(right.position?.[1] || 0);
+			const leftX = Number(left.position?.[0] || 0);
+			const rightX = Number(right.position?.[0] || 0);
+			return leftY - rightY || leftX - rightX;
+		});
+
+	if (triggerNodes.length === 0) return [0, 0];
+
+	const [x = 0, y = 0] = triggerNodes[0].position || [0, 0];
+	return [x, y + 180];
+}
+
+function findDevelopmentTestWebhookNode(workflow, manifest, slug) {
+	const testWebhookPath = developmentEntrypoints(manifest, slug).testWebhookPath;
+	const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+
+	return nodes
+		.filter(isWebhookNode)
+		.find(node => getWebhookPath(node) === testWebhookPath) || null;
+}
+
+function addDevelopmentTestWebhook(workflow, manifest, slug) {
+	const nextWorkflow = cloneJson(workflow);
+	if (!Array.isArray(nextWorkflow.nodes)) nextWorkflow.nodes = [];
+
+	const existing = findDevelopmentTestWebhookNode(nextWorkflow, manifest, slug);
+	if (existing) {
+		return {
+			workflow: nextWorkflow,
+			added: false,
+			node: existing
+		};
+	}
+
+	const testWebhookPath = developmentEntrypoints(manifest, slug).testWebhookPath;
+	const node = {
+		parameters: {
+			httpMethod: 'POST',
+			path: testWebhookPath,
+			responseMode: 'responseNode',
+			options: {}
+		},
+		id: `development-test-webhook-${slug}`,
+		name: uniqueNodeName(nextWorkflow.nodes, 'Development Test Webhook'),
+		type: 'n8n-nodes-base.webhook',
+		typeVersion: 2.1,
+		position: triggerAnchorPosition(nextWorkflow),
+		webhookId: testWebhookPath
+	};
+
+	nextWorkflow.nodes.push(node);
+
+	return {
+		workflow: nextWorkflow,
+		added: true,
+		node
+	};
+}
+
 function updateManifest({
 	manifest,
 	slug,
@@ -478,10 +572,11 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 	const workflowName = pulledWorkflow.name;
 	const slug = slugify(workflowName);
 	const developmentName = developmentWorkflowName(slug);
+	const developmentWorkflow = addDevelopmentTestWebhook(pulledWorkflow, manifest, slug);
 	const description = await promptRequired(prompter, 'Description', manifest.description || '');
 	const author = await promptOptional(prompter, 'Author (optional)', manifest.author || '');
 	const createDevelopmentWorkflow = await promptYesNo(prompter, 'Create a separate development workflow now?', true);
-	const saveEnv = await promptYesNo(prompter, 'Save n8n values to .env.development?', false);
+	const saveEnv = await promptYesNo(prompter, 'Save n8n values to .env.development?', createDevelopmentWorkflow);
 
 	const summary = {
 		mode: 'existing n8n workflow',
@@ -508,7 +603,7 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 			n8nConfig,
 			'POST',
 			workflowApiUrl(n8nConfig.baseUrl),
-			workflowPayload(pulledWorkflow, developmentName)
+			workflowPayload(developmentWorkflow.workflow, developmentName)
 		);
 		developmentWorkflowId = clean(created?.id);
 		if (!developmentWorkflowId) {
@@ -532,7 +627,7 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 		}
 	});
 
-	writeJson(WORKFLOW_PATH, pulledWorkflow);
+	writeJson(WORKFLOW_PATH, developmentWorkflow.workflow);
 	writeJson(MANIFEST_PATH, nextManifest);
 	fs.writeFileSync(TODO_PATH, todoContent());
 
@@ -555,11 +650,13 @@ async function scratchSetup(prompter, envValues, manifest) {
 	const workflowName = await promptRequired(prompter, 'Workflow name');
 	const slug = slugify(workflowName);
 	const developmentName = developmentWorkflowName(slug);
+	const blankWorkflow = normalizeWorkflow(readJson(WORKFLOW_PATH), workflowName);
+	const developmentWorkflow = addDevelopmentTestWebhook(blankWorkflow, manifest, slug);
 	const description = await promptRequired(prompter, 'Description', manifest.description || '');
 	const author = await promptOptional(prompter, 'Author (optional)', manifest.author || '');
 	const createRemoteWorkflows = await promptYesNo(prompter, 'Create production and development workflows in n8n now?', true);
 	const n8nConfig = createRemoteWorkflows ? await getN8nConfig(prompter, envValues) : null;
-	const saveEnv = await promptYesNo(prompter, 'Save development values to .env.development?', false);
+	const saveEnv = await promptYesNo(prompter, 'Save development values to .env.development?', createRemoteWorkflows);
 
 	const summary = {
 		mode: 'start from scratch',
@@ -579,7 +676,6 @@ async function scratchSetup(prompter, envValues, manifest) {
 		return;
 	}
 
-	const blankWorkflow = normalizeWorkflow(readJson(WORKFLOW_PATH), workflowName);
 	let productionWorkflowId = null;
 	let developmentWorkflowId = null;
 
@@ -599,7 +695,7 @@ async function scratchSetup(prompter, envValues, manifest) {
 			n8nConfig,
 			'POST',
 			workflowApiUrl(n8nConfig.baseUrl),
-			workflowPayload(blankWorkflow, developmentName)
+			workflowPayload(developmentWorkflow.workflow, developmentName)
 		);
 		developmentWorkflowId = clean(createdDevelopment?.id);
 		if (!developmentWorkflowId) {
@@ -625,7 +721,7 @@ async function scratchSetup(prompter, envValues, manifest) {
 			: null
 	});
 
-	writeJson(WORKFLOW_PATH, blankWorkflow);
+	writeJson(WORKFLOW_PATH, developmentWorkflow.workflow);
 	writeJson(MANIFEST_PATH, nextManifest);
 	fs.writeFileSync(TODO_PATH, todoContent());
 

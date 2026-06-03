@@ -22,8 +22,8 @@ Development test webhooks should use n8n Header Auth. `npm run setup` generates 
 
 This keeps discovered development webhook URLs from being usable without also knowing the local secret. The tracked workflow may contain the webhook node and path, but it should not contain the credential secret value.
 
-## Generate The Development Test Webhook In The Variant
+## Setup Adds The Development Test Webhook
 
-The tracked workflow source does not have to contain the development test webhook. When `environments.development.entrypoints.testWebhookPath` is configured, development push and verify create the webhook node in the generated development variant if it is missing.
+The setup script adds the development test webhook to `workflow.json` when it creates or pulls a project workflow. When another trigger exists on the canvas, setup places the webhook below it and leaves it unconnected.
 
-This keeps the source workflow focused on the project workflow while still giving development deployments a visible, unconnected test entrypoint that users or agents can wire intentionally.
+This makes the development test entrypoint visible immediately after setup. Push scripts should push the configured workflow source; they should not invent workflow nodes.

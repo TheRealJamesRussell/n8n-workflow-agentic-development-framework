@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const readline = require('readline/promises');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -229,13 +230,21 @@ function workflowPayload(workflow, name) {
 	};
 }
 
-function envFileContent({ baseUrl, apiKey, workflowId, workflowName }) {
+function generateSecret() {
+	return crypto.randomBytes(32).toString('base64url');
+}
+
+function envFileContent({ baseUrl, apiKey, workflowId, workflowName, webhookSecretHeader, webhookSecret }) {
 	return [
 		'N8N_ENVIRONMENT=development',
 		`N8N_BASE_URL=${baseUrl || ''}`,
 		`N8N_API_KEY=${apiKey || ''}`,
 		`N8N_DEVELOPMENT_WORKFLOW_ID=${workflowId || ''}`,
 		`N8N_DEVELOPMENT_WORKFLOW_NAME=${workflowName || ''}`,
+		'',
+		'# Local secret sent by Layer 3 tests to the development webhook Header Auth credential.',
+		`N8N_DEVELOPMENT_WEBHOOK_SECRET_HEADER=${webhookSecretHeader || 'X-N8N-Development-Webhook-Secret'}`,
+		`N8N_DEVELOPMENT_WEBHOOK_SECRET=${webhookSecret || ''}`,
 		'',
 		'N8N_ACTIVATE_DEVELOPMENT_WORKFLOW=false',
 		'N8N_REQUIRE_ACTIVE_WORKFLOW=false',
@@ -259,7 +268,7 @@ function todoContent() {
 		'- [ ] Rate live testability.',
 		'- [ ] Add Code-node fixtures.',
 		'- [ ] Add Layer 3 workflow fixtures.',
-		'- [ ] Harden development webhook access.',
+		'- [ ] Configure development webhook Header Auth in n8n using the local .env.development secret.',
 		''
 	].join('\n');
 }
@@ -519,7 +528,9 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 			baseUrl: n8nConfig.baseUrl,
 			apiKey: n8nConfig.apiKey,
 			workflowId: developmentWorkflowId,
-			workflowName: developmentName
+			workflowName: developmentName,
+			webhookSecretHeader: envValues.N8N_DEVELOPMENT_WEBHOOK_SECRET_HEADER,
+			webhookSecret: envValues.N8N_DEVELOPMENT_WEBHOOK_SECRET || generateSecret()
 		}));
 	}
 
@@ -535,7 +546,7 @@ async function scratchSetup(prompter, envValues, manifest) {
 	const author = await promptOptional(prompter, 'Author (optional)', manifest.author || '');
 	const createRemoteWorkflows = await promptYesNo(prompter, 'Create production and development workflows in n8n now?', true);
 	const n8nConfig = createRemoteWorkflows ? await getN8nConfig(prompter, envValues) : null;
-	const saveEnv = n8nConfig ? await promptYesNo(prompter, 'Save n8n values to .env.development?', false) : false;
+	const saveEnv = await promptYesNo(prompter, 'Save development values to .env.development?', false);
 
 	const summary = {
 		mode: 'start from scratch',
@@ -607,10 +618,12 @@ async function scratchSetup(prompter, envValues, manifest) {
 
 	if (saveEnv) {
 		fs.writeFileSync(ENV_PATH, envFileContent({
-			baseUrl: n8nConfig.baseUrl,
-			apiKey: n8nConfig.apiKey,
+			baseUrl: n8nConfig?.baseUrl,
+			apiKey: n8nConfig?.apiKey,
 			workflowId: developmentWorkflowId,
-			workflowName: developmentName
+			workflowName: developmentName,
+			webhookSecretHeader: envValues.N8N_DEVELOPMENT_WEBHOOK_SECRET_HEADER,
+			webhookSecret: envValues.N8N_DEVELOPMENT_WEBHOOK_SECRET || generateSecret()
 		}));
 	}
 

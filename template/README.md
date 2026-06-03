@@ -25,9 +25,11 @@ This starter keeps an n8n workflow export under source control and adds a small 
 
 - `npm run check` validates required files, manifest metadata, workflow JSON, and development command guards.
 - `npm run test:code` runs metadata-driven local Code-node fixtures.
-- `npm test` runs checks and local Code-node fixtures.
+- `npm run test:local` runs checks and local Code-node fixtures.
+- `npm test` runs `npm run test:local`.
+- `npm run pushdev` pushes, activates, and verifies the configured development workflow.
 - `npm run n8n:push:development` pushes `workflow.json` to the configured development workflow.
 - `npm run n8n:verify:development` compares the configured development workflow to the generated development variant.
-- `npm run test:workflow` posts Layer 3 fixtures to the configured development test webhook.
+- `npm run test:workflow` runs `pushdev`, then posts Layer 3 fixtures to the configured development test webhook.
 
 Live n8n commands require `.env.development` values and `N8N_ENVIRONMENT=development`.

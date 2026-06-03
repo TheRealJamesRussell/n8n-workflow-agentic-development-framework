@@ -4,6 +4,7 @@ const { discoverFixtures } = require('./layer3/fixtures');
 const { fetchExecution, webhookUrl } = require('./layer3/n8n-api');
 const { writeReport } = require('./layer3/report');
 const { generateTestRunId, postFixture, prepareFixtureUpload } = require('./layer3/request');
+const { parseTestRunnerArgs } = require('./test-runner-args');
 
 function createFixtureProgress(fixtureName) {
 	const isTty = process.stdout.isTTY === true;
@@ -40,7 +41,7 @@ async function runFixture(config, url, fixture) {
 	fixture.testRunId = generateTestRunId(fixture.name);
 	prepareFixtureUpload(fixture);
 
-	const response = await postFixture(url, fixture);
+	const response = await postFixture(url, fixture, config);
 	assertFixtureResponse(fixture, response);
 
 	let execution = null;
@@ -65,8 +66,14 @@ async function runFixture(config, url, fixture) {
 }
 
 async function main() {
+	const args = parseTestRunnerArgs(process.argv.slice(2), 'node scripts/run-development-fixtures.js');
+	if (args.help) {
+		console.log(args.usage);
+		return;
+	}
+
 	const config = requireDevelopmentEnv({ requireTestWebhook: true });
-	const fixtures = discoverFixtures();
+	const fixtures = discoverFixtures(undefined, { only: args.only });
 
 	if (fixtures.length === 0) {
 		console.log('No development fixtures found in tests/development-fixtures; skipping Layer 3 workflow tests.');

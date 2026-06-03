@@ -80,12 +80,29 @@ function buildRequest(fixture) {
 	throw new Error(`Fixture ${fixture.name} has unsupported request.type "${type}".`);
 }
 
+function addDevelopmentWebhookAuthHeader(request, config) {
+	if (!config.developmentWebhookSecret) {
+		throw new Error([
+			'Missing required development webhook secret.',
+			'Set N8N_DEVELOPMENT_WEBHOOK_SECRET before running Layer 3 workflow tests.'
+		].join(' '));
+	}
+
+	return {
+		...request,
+		headers: {
+			...request.headers,
+			[config.developmentWebhookSecretHeader || 'X-N8N-Development-Webhook-Secret']: config.developmentWebhookSecret
+		}
+	};
+}
+
 function prepareFixtureUpload(fixture) {
 	fixture.upload = {};
 }
 
-async function postFixture(url, fixture) {
-	const request = buildRequest(fixture);
+async function postFixture(url, fixture, config) {
+	const request = addDevelopmentWebhookAuthHeader(buildRequest(fixture), config);
 	const response = await fetch(url, {
 		method: fixture.request?.method || 'POST',
 		body: request.body,

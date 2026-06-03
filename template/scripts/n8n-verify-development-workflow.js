@@ -3,6 +3,7 @@ const {
 	comparableWorkflow,
 	createDevelopmentWorkflowVariant,
 	n8nRequest,
+	preserveDevelopmentTestWebhookAuth,
 	readJson,
 	requireDevelopmentEnv,
 	stableJson,
@@ -14,10 +15,14 @@ async function main() {
 	const config = requireDevelopmentEnv();
 	const localWorkflow = readJson(config.localWorkflowPath);
 	const developmentVariant = createDevelopmentWorkflowVariant(localWorkflow, config);
-	writeJson(developmentVariant.variantPath, developmentVariant.workflow);
-
 	const remoteWorkflow = await n8nRequest(config, 'GET');
 	validateRemoteDevelopmentWorkflow(config, remoteWorkflow);
+	const preservedAuth = preserveDevelopmentTestWebhookAuth(
+		developmentVariant.workflow,
+		remoteWorkflow,
+		config.manifest
+	);
+	writeJson(developmentVariant.variantPath, developmentVariant.workflow);
 	const webhookCheck = assertDevelopmentTestWebhookIfPresent(remoteWorkflow, config.manifest);
 
 	if (config.requireActiveWorkflow && remoteWorkflow.active !== true) {
@@ -36,6 +41,9 @@ async function main() {
 	}
 
 	console.log(`Verified development workflow ${config.workflowId} matches ${developmentVariant.variantPath}`);
+	if (preservedAuth.preserved) {
+		console.log(`Preserved development test webhook ${preservedAuth.authentication} authentication`);
+	}
 	if (webhookCheck.checked) {
 		console.log(`Verified development test webhook node(s): ${webhookCheck.nodes.join(', ')}`);
 	}

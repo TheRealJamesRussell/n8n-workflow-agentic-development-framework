@@ -3,8 +3,10 @@
   "scripts": {
     "check": "node scripts/check-static.js",
     "test:code": "node scripts/run-code-node-fixtures.js",
-    "test": "npm run check && npm run test:code",
-    "test:workflow": "N8N_ENVIRONMENT=development node scripts/run-development-fixtures.js",
+    "test:local": "npm run check && npm run test:code",
+    "test": "npm run test:local",
+    "pushdev": "N8N_ENVIRONMENT=development N8N_ACTIVATE_DEVELOPMENT_WORKFLOW=true node scripts/n8n-push-development-workflow.js && N8N_ENVIRONMENT=development N8N_REQUIRE_ACTIVE_WORKFLOW=true node scripts/n8n-verify-development-workflow.js",
+    "test:workflow": "npm run pushdev && N8N_ENVIRONMENT=development node scripts/run-development-fixtures.js",
     "n8n:pull:development": "N8N_ENVIRONMENT=development node scripts/n8n-pull-development-workflow.js",
     "n8n:push:development": "N8N_ENVIRONMENT=development node scripts/n8n-push-development-workflow.js",
     "n8n:verify:development": "N8N_ENVIRONMENT=development node scripts/n8n-verify-development-workflow.js",

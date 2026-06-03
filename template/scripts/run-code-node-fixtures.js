@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { filterNames, parseTestRunnerArgs } = require('./test-runner-args');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const FIXTURES_DIR = 'tests/code-node-fixtures';
@@ -57,9 +58,9 @@ function getCode(workflow, nodeName) {
 	return code;
 }
 
-async function runCode(code, { inputItems = [], nodeOutputs = {}, context = {} } = {}) {
-	const fn = new AsyncFunction('$input', '$', code);
-	return await fn.call(context, makeInputApi(inputItems), makeDollar(nodeOutputs));
+async function runCode(code, { inputItems = [], nodeOutputs = {}, context = {}, env = {}, vars = {} } = {}) {
+	const fn = new AsyncFunction('$input', '$', '$env', '$vars', code);
+	return await fn.call(context, makeInputApi(inputItems), makeDollar(nodeOutputs), env, vars);
 }
 
 function discoverFixtures() {
@@ -108,7 +109,9 @@ async function runFixture(workflow, fixture) {
 	const output = await runCode(code, {
 		inputItems: resolveItems(fixture.dir, fixture.input),
 		nodeOutputs: fixture.nodeOutputs || {},
-		context: fixture.context || {}
+		context: fixture.context || {},
+		env: fixture.env || {},
+		vars: fixture.vars || {}
 	});
 
 	if (fixture.expected?.output !== undefined) {
@@ -119,8 +122,21 @@ async function runFixture(workflow, fixture) {
 }
 
 async function main() {
+	const args = parseTestRunnerArgs(process.argv.slice(2), 'node scripts/run-code-node-fixtures.js');
+	if (args.help) {
+		console.log(args.usage);
+		return;
+	}
+
 	const workflow = readWorkflow();
-	const fixtures = discoverFixtures();
+	const discoveredFixtures = discoverFixtures();
+	const fixtureNames = filterNames(
+		discoveredFixtures.map(fixture => fixture.name),
+		args.only,
+		'Code-node fixture'
+	);
+	const fixtureByName = new Map(discoveredFixtures.map(fixture => [fixture.name, fixture]));
+	const fixtures = fixtureNames.map(name => fixtureByName.get(name));
 
 	if (fixtures.length === 0) {
 		console.log(`No Code-node fixtures found in ${FIXTURES_DIR}; skipping.`);

@@ -4,6 +4,7 @@ const {
 	assertDevelopmentTestWebhookIfPresent,
 	comparableWorkflow,
 	createDevelopmentWorkflowVariant,
+	ensureDevelopmentTestWebhookAuth,
 	n8nRequest,
 	readJson,
 	requireDevelopmentEnv,
@@ -17,14 +18,18 @@ async function main() {
 	const config = requireDevelopmentEnv();
 	const localWorkflow = readJson(config.localWorkflowPath);
 	const developmentVariant = createDevelopmentWorkflowVariant(localWorkflow, config);
+	const remoteWorkflow = await n8nRequest(config, 'GET');
+	validateRemoteDevelopmentWorkflow(config, remoteWorkflow);
+	const webhookAuth = await ensureDevelopmentTestWebhookAuth(
+		developmentVariant.workflow,
+		remoteWorkflow,
+		config
+	);
 	writeJson(developmentVariant.variantPath, developmentVariant.workflow);
 
 	if (config.activateDevelopmentWorkflow) {
 		assertDevelopmentActivationSafety(developmentVariant.workflow, config);
 	}
-
-	const remoteWorkflow = await n8nRequest(config, 'GET');
-	validateRemoteDevelopmentWorkflow(config, remoteWorkflow);
 
 	const payload = workflowUpdatePayload(developmentVariant.workflow, config);
 	const updatedWorkflow = await n8nRequest(config, 'PUT', payload);
@@ -55,6 +60,12 @@ async function main() {
 	writeJson(config.remoteSnapshotPath, finalRemoteWorkflow);
 
 	console.log(`Updated development workflow ${config.workflowId}`);
+	if (webhookAuth.preserved) {
+		console.log(`Preserved development test webhook ${webhookAuth.authentication} authentication`);
+	}
+	if (webhookAuth.created) {
+		console.log(`Created development test webhook ${webhookAuth.authentication} credential`);
+	}
 	if (webhookCheck.checked) {
 		console.log(`Verified development test webhook node(s): ${webhookCheck.nodes.join(', ')}`);
 	}

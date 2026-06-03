@@ -72,6 +72,28 @@ function requireDevelopmentTestWebhookPath(manifest) {
 	return testWebhookPath;
 }
 
+function getDevelopmentWebhookSecretHeader() {
+	return clean(process.env.N8N_DEVELOPMENT_WEBHOOK_SECRET_HEADER) ||
+		'X-N8N-Development-Webhook-Secret';
+}
+
+function getDevelopmentWebhookSecret() {
+	return clean(process.env.N8N_DEVELOPMENT_WEBHOOK_SECRET);
+}
+
+function requireDevelopmentWebhookSecret() {
+	const secret = getDevelopmentWebhookSecret();
+
+	if (!secret) {
+		throw new Error([
+			'Missing required development webhook secret.',
+			'Set N8N_DEVELOPMENT_WEBHOOK_SECRET before running Layer 3 workflow tests.'
+		].join(' '));
+	}
+
+	return secret;
+}
+
 function requireDevelopmentEnv(options = {}) {
 	loadLocalEnv();
 
@@ -106,6 +128,8 @@ function requireDevelopmentEnv(options = {}) {
 		workflowName,
 		localWorkflowPath,
 		testWebhookPath: getDevelopmentTestWebhookPath(manifest),
+		developmentWebhookSecretHeader: getDevelopmentWebhookSecretHeader(),
+		developmentWebhookSecret: getDevelopmentWebhookSecret(),
 		activateDevelopmentWorkflow: envFlag('N8N_ACTIVATE_DEVELOPMENT_WORKFLOW'),
 		requireActiveWorkflow: envFlag('N8N_REQUIRE_ACTIVE_WORKFLOW'),
 		developmentVariantPath: clean(process.env.N8N_DEVELOPMENT_VARIANT_PATH) ||
@@ -154,6 +178,10 @@ function findDevelopmentTestWebhookNodes(workflow, manifest) {
 		.filter(node => getWebhookPath(node) === testWebhookPath);
 }
 
+function findFirstDevelopmentTestWebhookNode(workflow, manifest) {
+	return findDevelopmentTestWebhookNodes(workflow, manifest)[0] || null;
+}
+
 function assertDevelopmentTestWebhookIfPresent(workflow, manifest) {
 	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
 	if (!testWebhookPath) {
@@ -168,6 +196,31 @@ function assertDevelopmentTestWebhookIfPresent(workflow, manifest) {
 	return {
 		checked: true,
 		nodes: matchingNodes.map(node => node.name || '(unnamed Webhook)')
+	};
+}
+
+function preserveDevelopmentTestWebhookAuth(targetWorkflow, remoteWorkflow, manifest) {
+	const targetNode = findFirstDevelopmentTestWebhookNode(targetWorkflow, manifest);
+	const remoteNode = findFirstDevelopmentTestWebhookNode(remoteWorkflow, manifest);
+	const remoteAuthentication = clean(remoteNode?.parameters?.authentication);
+
+	if (!targetNode || !remoteNode || !remoteAuthentication) {
+		return {
+			preserved: false
+		};
+	}
+
+	if (!targetNode.parameters) targetNode.parameters = {};
+	targetNode.parameters.authentication = remoteAuthentication;
+
+	if (remoteNode.credentials) {
+		targetNode.credentials = cloneJson(remoteNode.credentials);
+	}
+
+	return {
+		preserved: true,
+		authentication: remoteAuthentication,
+		credentialTypes: Object.keys(remoteNode.credentials || {})
 	};
 }
 
@@ -234,6 +287,10 @@ function workflowActionApiUrl(config, action) {
 	return `${workflowApiUrl(config)}/${encodeURIComponent(action)}`;
 }
 
+function credentialsApiUrl(config) {
+	return `${config.baseUrl}/api/v1/credentials`;
+}
+
 async function n8nRequest(config, method, body, url = workflowApiUrl(config)) {
 	const response = await fetch(url, {
 		method,
@@ -262,6 +319,89 @@ async function n8nRequest(config, method, body, url = workflowApiUrl(config)) {
 	}
 
 	return payload;
+}
+
+async function createDevelopmentWebhookCredential(config) {
+	const headerName = getDevelopmentWebhookSecretHeader();
+	const secret = requireDevelopmentWebhookSecret();
+	const credentialName = `${config.workflowName} development webhook header`;
+	const credential = await n8nRequest(
+		config,
+		'POST',
+		{
+			name: credentialName,
+			type: 'httpHeaderAuth',
+			data: {
+				name: headerName,
+				value: secret
+			}
+		},
+		credentialsApiUrl(config)
+	);
+	const credentialId = clean(credential?.id);
+
+	if (!credentialId) {
+		throw new Error('n8n did not return an ID for the created development webhook Header Auth credential.');
+	}
+
+	return {
+		id: credentialId,
+		name: clean(credential?.name) || credentialName
+	};
+}
+
+function applyDevelopmentWebhookCredential(targetWorkflow, manifest, credential) {
+	const nodes = findDevelopmentTestWebhookNodes(targetWorkflow, manifest);
+
+	for (const node of nodes) {
+		if (!node.parameters) node.parameters = {};
+		node.parameters.authentication = 'headerAuth';
+		node.credentials = {
+			...(node.credentials || {}),
+			httpHeaderAuth: {
+				id: credential.id,
+				name: credential.name
+			}
+		};
+	}
+
+	return nodes;
+}
+
+async function ensureDevelopmentTestWebhookAuth(targetWorkflow, remoteWorkflow, config) {
+	const preserved = preserveDevelopmentTestWebhookAuth(targetWorkflow, remoteWorkflow, config.manifest);
+	if (preserved.preserved) return preserved;
+
+	const targetNodes = findDevelopmentTestWebhookNodes(targetWorkflow, config.manifest);
+	if (targetNodes.length === 0) {
+		return {
+			preserved: false,
+			created: false,
+			reason: 'workflow has no matching development test webhook'
+		};
+	}
+
+	const localAuthNodes = targetNodes.filter(node => {
+		return clean(node?.parameters?.authentication) && Object.keys(node?.credentials || {}).length > 0;
+	});
+	if (localAuthNodes.length > 0) {
+		return {
+			preserved: false,
+			created: false,
+			reason: 'development test webhook already has local authentication'
+		};
+	}
+
+	const credential = await createDevelopmentWebhookCredential(config);
+	applyDevelopmentWebhookCredential(targetWorkflow, config.manifest, credential);
+
+	return {
+		preserved: false,
+		created: true,
+		authentication: 'headerAuth',
+		credentialTypes: ['httpHeaderAuth'],
+		credentialName: credential.name
+	};
 }
 
 async function activateDevelopmentWorkflow(config) {
@@ -312,12 +452,15 @@ module.exports = {
 	assertWorkflowHasDevelopmentTestWebhook,
 	comparableWorkflow,
 	createDevelopmentWorkflowVariant,
+	ensureDevelopmentTestWebhookAuth,
 	getDevelopmentTestWebhookPath,
 	loadLocalEnv,
 	n8nRequest,
+	preserveDevelopmentTestWebhookAuth,
 	readJson,
 	requireDevelopmentEnv,
 	requireDevelopmentTestWebhookPath,
+	requireDevelopmentWebhookSecret,
 	stableJson,
 	validateRemoteDevelopmentWorkflow,
 	workflowUpdatePayload,

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { filterNames } = require('../test-runner-args');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const DEFAULT_FIXTURE_ROOT = 'tests/development-fixtures';
@@ -12,14 +13,17 @@ function readJson(filePath) {
 	return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function discoverFixtures(relativeRoot = DEFAULT_FIXTURE_ROOT) {
+function discoverFixtures(relativeRoot = DEFAULT_FIXTURE_ROOT, options = {}) {
 	const root = repoPath(relativeRoot);
 	if (!fs.existsSync(root)) return [];
 
-	return fs.readdirSync(root, { withFileTypes: true })
+	const names = fs.readdirSync(root, { withFileTypes: true })
 		.filter(entry => entry.isDirectory())
 		.map(entry => entry.name)
-		.sort()
+		.sort();
+	const selectedNames = filterNames(names, options.only || [], 'development fixture');
+
+	return selectedNames
 		.map(name => {
 			const dir = path.join(root, name);
 			const fixturePath = path.join(dir, 'fixture.json');

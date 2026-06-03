@@ -115,3 +115,21 @@ workflow projects.
 
 Impact: Template tests are run from inside `template/` until maintainer automation
 is deliberately added.
+
+## 2026-06-03 - Template Hardens Development Test Webhooks
+
+Status: Decided
+
+Decision: The template treats development test webhook hardening as default
+framework behavior when a project configures `environments.development.entrypoints.testWebhookPath`.
+
+Reason: Development webhook URLs can be discovered or shared accidentally. A
+generated local Header Auth secret lets the Layer 3 runner use the webhook while
+blocking unauthenticated calls.
+
+Impact: `template/scripts/setup-placeholder.js` generates a local webhook secret
+when it writes `.env.development`. `template/scripts/n8n-push-development-workflow.js`
+creates or preserves the remote n8n Header Auth credential for the development
+test webhook. `template/scripts/run-development-fixtures.js` sends the configured
+secret header during Layer 3 tests. The tracked workflow source should not contain
+the credential secret value.

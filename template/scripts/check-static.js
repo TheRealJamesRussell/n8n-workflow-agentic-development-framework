@@ -13,11 +13,18 @@ const REQUIRED_FILES = [
 	'scripts/n8n-lib.js',
 	'scripts/run-code-node-fixtures.js',
 	'scripts/run-development-fixtures.js',
+	'scripts/test-runner-args.js',
 	'scripts/layer3/assertions.js',
 	'scripts/layer3/fixtures.js',
 	'scripts/layer3/n8n-api.js',
 	'scripts/layer3/report.js',
 	'scripts/layer3/request.js',
+	'docs/testing-guides/running-tests.md',
+	'docs/testing-guides/test-types.md',
+	'docs/testing-guides/test-writing-rules.md',
+	'docs/testing-guides/writing-code-node-fixtures.md',
+	'docs/testing-guides/writing-repo-tests.md',
+	'docs/testing-guides/writing-workflow-fixtures.md',
 	'tests/code-node-fixtures',
 	'tests/development-fixtures'
 ];
@@ -134,7 +141,9 @@ function checkPackageScripts() {
 		'check',
 		'test',
 		'test:code',
+		'test:local',
 		'test:workflow',
+		'pushdev',
 		'n8n:pull:development',
 		'n8n:push:development',
 		'n8n:verify:development'
@@ -149,6 +158,7 @@ function checkDevelopmentGuards() {
 	const packageJson = readJson('package.json');
 	const scripts = packageJson.scripts || {};
 	const liveCommands = [
+		'pushdev',
 		'test:workflow',
 		'n8n:pull:development',
 		'n8n:push:development',

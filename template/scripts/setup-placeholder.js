@@ -173,6 +173,19 @@ function developmentWorkflowName(slug) {
 	return `development_${slug}`;
 }
 
+function developmentEntrypoints(manifest, slug) {
+	const existing = manifest.environments?.development?.entrypoints || {};
+	const existingTestWebhookPath = clean(existing.testWebhookPath);
+	const placeholderTestWebhookPath = 'project-name-development-test';
+
+	return {
+		...existing,
+		testWebhookPath: existingTestWebhookPath && existingTestWebhookPath !== placeholderTestWebhookPath
+			? existingTestWebhookPath
+			: `${slug}-development-test`
+	};
+}
+
 function updateManifest({
 	manifest,
 	slug,
@@ -197,7 +210,7 @@ function updateManifest({
 				baseUrl: developmentBaseUrl,
 				workflowId: developmentWorkflowId,
 				workflowName: developmentName,
-				entrypoints: {}
+				entrypoints: developmentEntrypoints(manifest, slug)
 			},
 			production: production
 				? {
@@ -535,7 +548,7 @@ async function existingWorkflowSetup(prompter, envValues, manifest) {
 	}
 
 	console.log('\nSetup complete.');
-	console.log('Next: review TODO.md and inspect the workflow before adding development test webhook metadata.');
+	console.log('Next: review TODO.md and inspect the workflow before wiring the development test webhook.');
 }
 
 async function scratchSetup(prompter, envValues, manifest) {
@@ -628,7 +641,7 @@ async function scratchSetup(prompter, envValues, manifest) {
 	}
 
 	console.log('\nSetup complete.');
-	console.log('Next: review TODO.md and build the workflow before adding development test webhook metadata.');
+	console.log('Next: review TODO.md and build the workflow before wiring the development test webhook.');
 }
 
 async function main() {

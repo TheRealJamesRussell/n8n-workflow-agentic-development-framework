@@ -19,7 +19,7 @@ The secret is generated locally and stays in `.env.development`. Do not commit i
 
 `npm run n8n:push:development` reads the local workflow and creates a development variant under `tmp/`.
 
-If `manifest.json` configures `environments.development.entrypoints.testWebhookPath` and the tracked workflow does not already contain that webhook, the generated development variant adds an unconnected `Development Test Webhook` node. When another trigger exists on the canvas, the node is placed below it.
+If `manifest.json` configures `environments.development.entrypoints.testWebhookPath` and the tracked workflow does not already contain that webhook, the generated development variant adds an unconnected `Development Test Webhook` node. Setup derives this path from the project slug by default. When another trigger exists on the canvas, the node is placed below it.
 
 The push script then checks the remote development workflow:
 

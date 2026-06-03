@@ -59,7 +59,8 @@ function loadLocalEnv() {
 }
 
 function getDevelopmentTestWebhookPath(manifest) {
-	return clean(manifest.environments?.development?.entrypoints?.testWebhookPath);
+	return clean(manifest.environments?.development?.entrypoints?.testWebhookPath) ||
+		`${slugPart(manifest.name)}-development-test`;
 }
 
 function requireDevelopmentTestWebhookPath(manifest) {

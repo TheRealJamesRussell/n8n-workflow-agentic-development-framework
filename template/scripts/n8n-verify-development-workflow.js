@@ -41,6 +41,9 @@ async function main() {
 	}
 
 	console.log(`Verified development workflow ${config.workflowId} matches ${developmentVariant.variantPath}`);
+	if (developmentVariant.developmentTestWebhook.added) {
+		console.log(`Added development test webhook node in generated variant: ${developmentVariant.developmentTestWebhook.node.name}`);
+	}
 	if (preservedAuth.preserved) {
 		console.log(`Preserved development test webhook ${preservedAuth.authentication} authentication`);
 	}

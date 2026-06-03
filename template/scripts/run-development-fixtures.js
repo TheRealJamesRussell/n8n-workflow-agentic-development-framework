@@ -1,7 +1,13 @@
 const { requireDevelopmentEnv } = require('./n8n-lib');
-const { assertExecutionNodes, assertFixtureResponse, getExecutionRunDataNodes } = require('./layer3/assertions');
+const {
+	assertExecutionNodes,
+	assertFixtureResponse,
+	getExecutionRunDataNodes,
+	getLastExecutionNode,
+	summarizeExecution
+} = require('./layer3/assertions');
 const { discoverFixtures } = require('./layer3/fixtures');
-const { fetchExecution, webhookUrl } = require('./layer3/n8n-api');
+const { fetchExecution, findExecutionByTestRunId, webhookUrl } = require('./layer3/n8n-api');
 const { writeReport } = require('./layer3/report');
 const { generateTestRunId, postFixture, prepareFixtureUpload } = require('./layer3/request');
 const { parseTestRunnerArgs } = require('./test-runner-args');
@@ -47,6 +53,23 @@ async function runFixture(config, url, fixture) {
 	let execution = null;
 	if (response.executionId) {
 		execution = await fetchExecution(config, response.executionId);
+	} else {
+		execution = await findExecutionByTestRunId(config, fixture.testRunId);
+	}
+
+	if (!response) {
+		const lastNode = getLastExecutionNode(execution);
+		const error = new Error([
+			`${fixture.name} workflow did not return the development test response.`,
+			lastNode ? `Last executed node: ${lastNode}.` : 'No matching execution data was found.'
+		].join(' '));
+		error.details = {
+			execution: summarizeExecution(execution)
+		};
+		throw error;
+	}
+
+	if (execution) {
 		assertExecutionNodes(fixture, execution);
 	}
 
@@ -93,6 +116,23 @@ async function main() {
 			results.push(result);
 			console.log(`PASS ${fixture.name}`);
 		} catch (error) {
+			if (!error.details?.execution && fixture.testRunId) {
+				try {
+					const execution = await findExecutionByTestRunId(config, fixture.testRunId);
+					if (execution) {
+						error.details = {
+							...(error.details || {}),
+							execution: summarizeExecution(execution)
+						};
+					}
+				} catch (executionError) {
+					error.details = {
+						...(error.details || {}),
+						executionFetchError: executionError.message
+					};
+				}
+			}
+
 			progress.stop();
 			results.push({
 				name: fixture.name,

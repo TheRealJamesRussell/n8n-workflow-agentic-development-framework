@@ -165,8 +165,103 @@ function isWebhookNode(node) {
 	return node?.type === 'n8n-nodes-base.webhook';
 }
 
+function isTriggerLikeNode(node) {
+	const type = clean(node?.type).toLowerCase();
+	return type.includes('trigger') || type === 'n8n-nodes-base.webhook';
+}
+
 function getWebhookPath(node) {
 	return clean(node?.parameters?.path || node?.parameters?.options?.path);
+}
+
+function slugPart(value) {
+	return clean(value)
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '') || 'development-test';
+}
+
+function uniqueNodeName(nodes, baseName) {
+	const existing = new Set(nodes.map(node => clean(node?.name)).filter(Boolean));
+	if (!existing.has(baseName)) return baseName;
+
+	let index = 2;
+	while (existing.has(`${baseName} ${index}`)) {
+		index += 1;
+	}
+
+	return `${baseName} ${index}`;
+}
+
+function triggerAnchorPosition(workflow) {
+	const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+	const triggerNodes = nodes
+		.filter(isTriggerLikeNode)
+		.sort((left, right) => {
+			const leftY = Number(left.position?.[1] || 0);
+			const rightY = Number(right.position?.[1] || 0);
+			const leftX = Number(left.position?.[0] || 0);
+			const rightX = Number(right.position?.[0] || 0);
+			return leftY - rightY || leftX - rightX;
+		});
+
+	if (triggerNodes.length === 0) {
+		return [0, 0];
+	}
+
+	const [x = 0, y = 0] = triggerNodes[0].position || [0, 0];
+	return [x, y + 180];
+}
+
+function createDevelopmentTestWebhookNode(workflow, manifest) {
+	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
+	if (!testWebhookPath) return null;
+
+	const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+	return {
+		parameters: {
+			httpMethod: 'POST',
+			path: testWebhookPath,
+			responseMode: 'responseNode',
+			options: {}
+		},
+		id: `development-test-webhook-${slugPart(testWebhookPath)}`,
+		name: uniqueNodeName(nodes, 'Development Test Webhook'),
+		type: 'n8n-nodes-base.webhook',
+		typeVersion: 2.1,
+		position: triggerAnchorPosition(workflow),
+		webhookId: testWebhookPath
+	};
+}
+
+function addDevelopmentTestWebhookIfMissing(workflow, manifest) {
+	const testWebhookPath = getDevelopmentTestWebhookPath(manifest);
+	if (!testWebhookPath) {
+		return {
+			added: false,
+			reason: 'not configured',
+			node: null
+		};
+	}
+
+	if (findDevelopmentTestWebhookNodes(workflow, manifest).length > 0) {
+		return {
+			added: false,
+			reason: 'already present',
+			node: null
+		};
+	}
+
+	if (!Array.isArray(workflow.nodes)) workflow.nodes = [];
+
+	const node = createDevelopmentTestWebhookNode(workflow, manifest);
+	workflow.nodes.push(node);
+
+	return {
+		added: true,
+		reason: 'created development variant webhook',
+		node
+	};
 }
 
 function findDevelopmentTestWebhookNodes(workflow, manifest) {
@@ -270,10 +365,12 @@ function assertDevelopmentActivationSafety(workflow, config) {
 function createDevelopmentWorkflowVariant(sourceWorkflow, config) {
 	const workflow = cloneJson(sourceWorkflow);
 	workflow.name = config.workflowName || workflow.name;
+	const developmentTestWebhook = addDevelopmentTestWebhookIfMissing(workflow, config.manifest);
 
 	return {
 		workflow,
 		variantPath: config.developmentVariantPath,
+		developmentTestWebhook,
 		rewrittenFormTriggers: 0,
 		testWebhookCheck: assertDevelopmentTestWebhookIfPresent(workflow, config.manifest)
 	};

@@ -21,3 +21,9 @@ Live workflow fixtures post to n8n and assert response or execution shape. Exter
 Development test webhooks should use n8n Header Auth. `npm run setup` generates a local `N8N_DEVELOPMENT_WEBHOOK_SECRET` when it writes `.env.development`. The development push script creates or preserves the remote n8n Header Auth credential for the configured development test webhook. Layer 3 tests send the same secret header from the ignored local environment.
 
 This keeps discovered development webhook URLs from being usable without also knowing the local secret. The tracked workflow may contain the webhook node and path, but it should not contain the credential secret value.
+
+## Generate The Development Test Webhook In The Variant
+
+The tracked workflow source does not have to contain the development test webhook. When `environments.development.entrypoints.testWebhookPath` is configured, development push and verify create the webhook node in the generated development variant if it is missing.
+
+This keeps the source workflow focused on the project workflow while still giving development deployments a visible, unconnected test entrypoint that users or agents can wire intentionally.

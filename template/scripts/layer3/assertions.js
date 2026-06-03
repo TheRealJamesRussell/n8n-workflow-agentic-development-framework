@@ -36,6 +36,10 @@ function collectTypes(values) {
 
 function assertFixtureResponse(fixture, response) {
 	const expected = fixture.expected.response || {};
+	if (!response || typeof response !== 'object') {
+		fail(`${fixture.name} response missing`, { response });
+	}
+
 	const result = response.result || {};
 
 	if (expected.assertTestRunId === true) {
@@ -76,6 +80,34 @@ function getExecutionRunDataNodes(execution) {
 	return Object.keys(runData);
 }
 
+function getLastExecutionNode(execution) {
+	const runData = execution?.data?.resultData?.runData || {};
+	const entries = Object.entries(runData);
+
+	if (entries.length === 0) return null;
+
+	entries.sort(([, leftRuns], [, rightRuns]) => {
+		const leftStart = Number(leftRuns?.[0]?.startTime || 0);
+		const rightStart = Number(rightRuns?.[0]?.startTime || 0);
+		return leftStart - rightStart;
+	});
+
+	return entries[entries.length - 1][0];
+}
+
+function summarizeExecution(execution) {
+	if (!execution) return null;
+
+	return {
+		id: execution.id || null,
+		status: execution.status || null,
+		workflowId: execution.workflowId || null,
+		lastNode: getLastExecutionNode(execution),
+		error: execution.data?.resultData?.error?.message || null,
+		runDataNodes: getExecutionRunDataNodes(execution)
+	};
+}
+
 function assertExecutionNodes(fixture, execution) {
 	const expectedNodes = fixture.expected.execution?.expectedNodes || [];
 	if (expectedNodes.length === 0) return;
@@ -91,5 +123,7 @@ module.exports = {
 	assertExecutionNodes,
 	assertFixtureResponse,
 	fail,
+	getLastExecutionNode,
+	summarizeExecution,
 	getExecutionRunDataNodes
 };

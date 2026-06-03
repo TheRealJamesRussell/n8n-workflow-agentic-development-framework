@@ -62,7 +62,33 @@ function slugify(value) {
 }
 
 function normalizeBaseUrl(value) {
-	return clean(value).replace(/\/+$/, '');
+	const input = clean(value).replace(/\/+$/, '');
+	if (!input) return '';
+
+	try {
+		const url = new URL(input);
+		return `${url.protocol}//${url.host}`;
+	} catch (error) {
+		return input;
+	}
+}
+
+function parseWorkflowReference(value) {
+	const input = clean(value);
+	if (!input) return { workflowId: '', baseUrl: '' };
+
+	try {
+		const url = new URL(input);
+		return {
+			workflowId: parseWorkflowId(input),
+			baseUrl: `${url.protocol}//${url.host}`
+		};
+	} catch (error) {
+		return {
+			workflowId: input,
+			baseUrl: ''
+		};
+	}
 }
 
 function parseWorkflowId(value) {
@@ -351,6 +377,30 @@ async function getN8nConfig(prompter, envValues) {
 	return { baseUrl, apiKey };
 }
 
+async function getN8nConfigForWorkflow(prompter, envValues, workflowRef) {
+	const parsedWorkflowRef = parseWorkflowReference(workflowRef);
+	const existingApiKey = process.env.N8N_API_KEY || envValues.N8N_API_KEY || '';
+	const baseUrl = parsedWorkflowRef.baseUrl || normalizeBaseUrl(await promptRequired(
+		prompter,
+		'n8n base URL',
+		process.env.N8N_BASE_URL || envValues.N8N_BASE_URL || ''
+	));
+	const apiKey = await promptSecret(
+		prompter,
+		'n8n API key',
+		existingApiKey
+	);
+
+	if (!apiKey) {
+		throw new Error('n8n API key is required.');
+	}
+
+	return {
+		n8nConfig: { baseUrl, apiKey },
+		workflowId: parsedWorkflowRef.workflowId
+	};
+}
+
 function printSummary(summary) {
 	console.log('\nSetup summary');
 	console.log(`Mode: ${summary.mode}`);
@@ -395,9 +445,8 @@ function confirmationLabel(summary) {
 }
 
 async function existingWorkflowSetup(prompter, envValues, manifest) {
-	const n8nConfig = await getN8nConfig(prompter, envValues);
 	const workflowRef = await promptRequired(prompter, 'Production workflow URL or workflow ID');
-	const productionWorkflowId = parseWorkflowId(workflowRef);
+	const { n8nConfig, workflowId: productionWorkflowId } = await getN8nConfigForWorkflow(prompter, envValues, workflowRef);
 	const remoteWorkflow = await n8nRequest(
 		n8nConfig,
 		'GET',
